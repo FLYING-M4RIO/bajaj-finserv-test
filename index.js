@@ -3,70 +3,77 @@ const cors = require("cors");
 
 const app = express();
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
-const FULL_NAME = "Aryan_Laxaman"; 
-const DOB = "24062004"; 
+// Per spec: full name MUST be lowercase
+const FULL_NAME = "aryan_laxaman";
+const DOB = "24062004"; // ddmmyyyy
 const EMAIL = "aryan24laxaman@gmail.co";
 const ROLL_NUMBER = "22BAI1402";
 
+app.get("/bfhl", (req, res) => {
+  // Simple health endpoint (also helps verifiers)
+  res.status(200).json({ operation_code: 1 });
+});
+
 app.post("/bfhl", (req, res) => {
   try {
-    const data = req.body.data; 
+    const data = req.body?.data;
 
     if (!Array.isArray(data)) {
-      return res.status(400).json({ is_success: false, error: "Invalid input" });
+      return res.status(400).json({
+        is_success: false,
+        error: 'Invalid input. Expected: { "data": [ ... ] }',
+      });
     }
 
-    let even_numbers = [];
-    let odd_numbers = [];
-    let alphabets = [];
-    let special_chars = [];
-    let sum = 0;
+    // Helpers
+    const isNum = (s) => typeof s === "string" && /^[0-9]+$/.test(s);
+    const isAlpha = (s) => typeof s === "string" && /^[a-zA-Z]+$/.test(s);
+    const isAlphaNum = (s) => typeof s === "string" && /^[a-zA-Z0-9]+$/.test(s);
 
-    data.forEach(item => {
-      if (/^[0-9]+$/.test(item)) {
-        let num = parseInt(item);
-        sum += num;
-        if (num % 2 === 0) {
-          even_numbers.push(num);
-        } else {
-          odd_numbers.push(num);
-        }
-      } else if (/^[a-zA-Z]$/.test(item)) {
-        alphabets.push(item.toUpperCase());
-      } else {
-        special_chars.push(item);
-      }
-    });
+    // Keep numeric tokens as STRINGS (per spec)
+    const numberTokens = data.filter(isNum); // strings like "1","334"
+    const even_numbers = numberTokens.filter((n) => parseInt(n, 10) % 2 === 0); // strings
+    const odd_numbers = numberTokens.filter((n) => parseInt(n, 10) % 2 !== 0);  // strings
 
-    let concat = alphabets.join("").split("").reverse();
-    let alternatingCaps = concat.map((ch, i) => 
-      i % 2 === 0 ? ch.toUpperCase() : ch.toLowerCase()
-    ).join("");
+    // Alphabet tokens may be multi-letter, return token-level UPPERCASE
+    const alphaTokens = data.filter(isAlpha);           // e.g., ["a","ABcD","R"]
+    const alphabets = alphaTokens.map((s) => s.toUpperCase()); // ["A","ABCD","R"]
+
+    // Special characters → anything non-alphanumeric
+    const special_characters = data.filter((x) => !isAlphaNum(x));
+
+    // Sum of numbers → must be returned as STRING
+    const sum = numberTokens
+      .reduce((acc, n) => acc + parseInt(n, 10), 0)
+      .toString();
+
+    // Concatenate ALL alphabetical characters (character-level),
+    // reverse, alternating caps starting UPPER at index 0.
+    const concatChars = alphaTokens.join("").split("").reverse();
+    const concat_string = concatChars
+      .map((ch, i) => (i % 2 === 0 ? ch.toUpperCase() : ch.toLowerCase()))
+      .join("");
 
     const response = {
       is_success: true,
-      user_id: `${FULL_NAME}_${DOB}`,
+      user_id: `${FULL_NAME}_${DOB}`, // e.g. "john_doe_17091999"
       email: EMAIL,
       roll_number: ROLL_NUMBER,
-      even_numbers,
-      odd_numbers,
-      alphabets,
-      special_chars,
-      sum,
-      reverse_alternating_caps: alternatingCaps
+      odd_numbers,                    // arrays of STRINGS
+      even_numbers,                   // arrays of STRINGS
+      alphabets,                      // tokens uppercased
+      special_characters,
+      sum,                            // STRING
+      concat_string,                  // reverse alternating caps over all alpha chars
     };
 
-    res.status(200).json(response);
-
+    return res.status(200).json(response);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ is_success: false, error: "Server error" });
+    return res.status(500).json({ is_success: false, error: "Server error" });
   }
-});
-app.get("/bfhl", (req, res) => {
-  res.json({ operation_code: 1 });
 });
 
 const PORT = process.env.PORT || 3000;
