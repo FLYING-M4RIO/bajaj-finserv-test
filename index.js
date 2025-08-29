@@ -65,6 +65,9 @@ app.post("/bfhl", (req, res) => {
     res.status(500).json({ is_success: false, error: "Server error" });
   }
 });
+app.get("/bfhl", (req, res) => {
+  res.json({ operation_code: 1 });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
